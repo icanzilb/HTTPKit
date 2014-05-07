@@ -17,9 +17,32 @@
 @implementation DCHTTPTask
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+- (instancetype)init
+{
+    self = [super init];
+    if(self)
+    {
+        self.HTTPMethod = @"GET";
+    }
+    return self;
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////
 -(void)willStart
 {
-    NSURLRequest *request = [NSURLRequest requestWithURL:[NSURL URLWithString:self.url]];
+    NSError *error = nil;
+    if(!self.requestSerializer)
+        self.requestSerializer = [DCHTTPRequestSerializer new];
+    NSURLRequest *request = [self.requestSerializer requestBySerializingUrl:[NSURL URLWithString:self.url]
+                                                                     method:self.HTTPMethod
+                                                                 parameters:self.parameters error:&error];
+    if(error)
+    {
+        self.asyncTask = ^(DCAsyncTaskSuccess success, DCAsyncTaskFailure failure) {
+            failure(error);
+        };
+        return;
+    }
+    DCHTTPRequestSerializerRequestType type = [self.requestSerializer requestType];
     self.asyncTask = ^(DCAsyncTaskSuccess success, DCAsyncTaskFailure failure) {
         NSURLSession *session = [NSURLSession sharedSession];
         NSURLSessionDataTask *task = [session dataTaskWithRequest:request
@@ -28,7 +51,10 @@
                                           if(error) {
                                               failure(error);
                                           } else {
-                                              success(data);
+                                              DCHTTPResponse *response = [DCHTTPResponse new];
+                                              response.headers = [(NSHTTPURLResponse*)response allHeaderFields];
+                                              response.response = data;
+                                              success(response);
                                           }
                                       }];
         
@@ -43,5 +69,12 @@
     return task;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+@end
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+@implementation DCHTTPResponse
 
 @end
