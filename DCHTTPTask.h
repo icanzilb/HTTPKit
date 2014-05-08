@@ -8,6 +8,7 @@
 
 #import "DCTask.h"
 #import "DCHTTPRequestSerializer.h"
+#import "DCHTTPResponseSerializer.h"
 
 @interface DCHTTPResponse : NSObject
 
@@ -43,7 +44,7 @@
 /**
  The serializer you want to encode the response with (JSON,XML,etc). Default is nil, which means a NSData object will be returned.
  */
-@property(nonatomic,strong)id responseSerializer;
+@property(nonatomic,strong)id<DCHTTPResponseSerializerDelegate> responseSerializer;
 
 /**
  The HTTP method for this request. The default is GET.
@@ -57,8 +58,57 @@
 @property(nonatomic,assign,getter = isDownload)BOOL download;
 
 /**
- Factory method to create a request.
+ Factory method to create a request with HTTPMethod of GET.
+ @param: url is the full url you want to load (e.g. http://apple.com)
+ @return A newly initialized DCHTTPTask.
  */
 +(DCHTTPTask*)GET:(NSString*)url;
+
+/**
+ Factory method to create a request with HTTPMethod of GET.
+ @param: url is the full url you want to load (e.g. http://apple.com)
+ @param: parameters to send along with the request.
+ @return A newly initialized DCHTTPTask.
+ */
++(DCHTTPTask*)GET:(NSString*)url parameters:(NSDictionary*)parameters;
+
+/**
+ Factory method to create a request with HTTPMethod of HEAD.
+ @param: url is the full url you want to load (e.g. http://apple.com)
+ @return A newly initialized DCHTTPTask.
+ */
++(DCHTTPTask*)HEAD:(NSString*)url;
+
+/**
+ Factory method to create a request with HTTPMethod of HEAD.
+ @param: url is the full url you want to load (e.g. http://apple.com)
+ @param: parameters to send along with the request.
+ @return A newly initialized DCHTTPTask.
+ */
++(DCHTTPTask*)HEAD:(NSString*)url parameters:(NSDictionary*)parameters;
+
+/**
+ Factory method to create a request with HTTPMethod of DELETE.
+ @param: url is the full url you want to load (e.g. http://apple.com)
+ @param: parameters to send along with the request.
+ @return A newly initialized DCHTTPTask.
+ */
++(DCHTTPTask*)DELETE:(NSString*)url parameters:(NSDictionary*)parameters;
+
+/**
+ Factory method to create a request with HTTPMethod of POST.
+ @param: url is the full url you want to load (e.g. http://apple.com)
+ @param: parameters to send along with the request.
+ @return A newly initialized DCHTTPTask.
+ */
++(DCHTTPTask*)POST:(NSString*)url parameters:(NSDictionary*)parameters;
+
+/**
+ Factory method to create a request with HTTPMethod of PUT.
+ @param: url is the full url you want to load (e.g. http://apple.com)
+ @param: parameters to send along with the request.
+ @return A newly initialized DCHTTPTask.
+ */
++(DCHTTPTask*)PUT:(NSString*)url parameters:(NSDictionary*)parameters;
 
 @end

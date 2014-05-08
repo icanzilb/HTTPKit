@@ -28,11 +28,27 @@
 @property(nonatomic,assign)DCHTTPRequestSerializerRequestType type;
 @property(nonatomic,strong)NSSet *HTTPMethodsEncodingParametersInURI;
 @property(nonatomic,strong)NSSet *HTTPMethodsUploadVerb;
+@property(nonatomic,copy)NSString *contentTypeKey;
+@property(nonatomic,strong)NSMutableDictionary *headers;
 
 @end
 
 @implementation DCHTTPRequestSerializer
 
+static NSString * const kDCCharactersToBeEscapedInQueryString = @":/?&=;+!@#$()',*";
+
+static NSString * DCPercentEscapedQueryStringKeyFromStringWithEncoding(NSString *string, NSStringEncoding encoding) {
+    static NSString * const kAFCharactersToLeaveUnescapedInQueryStringPairKey = @"[].";
+    
+	return (__bridge_transfer  NSString *)CFURLCreateStringByAddingPercentEscapes(kCFAllocatorDefault, (__bridge CFStringRef)string,
+                                                                                  (__bridge CFStringRef)kAFCharactersToLeaveUnescapedInQueryStringPairKey, (__bridge CFStringRef)kDCCharactersToBeEscapedInQueryString, CFStringConvertNSStringEncodingToEncoding(encoding));
+}
+
+static NSString * DCPercentEscapedQueryStringValueFromStringWithEncoding(NSString *string, NSStringEncoding encoding) {
+	return (__bridge_transfer  NSString *)CFURLCreateStringByAddingPercentEscapes(kCFAllocatorDefault, (__bridge CFStringRef)string, NULL,
+                                                                                  (__bridge CFStringRef)kDCCharactersToBeEscapedInQueryString,
+                                                                                  CFStringConvertNSStringEncodingToEncoding(encoding));
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 - (instancetype)init
 {
@@ -49,6 +65,7 @@
         self.type = DCHTTPRequestSerializerRequestTypeNormal;
         self.HTTPMethodsEncodingParametersInURI = [NSSet setWithObjects:@"GET", @"HEAD", @"DELETE", nil];
         self.HTTPMethodsUploadVerb = [NSSet setWithObjects:@"PUT", @"POST", nil];
+        self.contentTypeKey = @"Content-Type";
     }
     return self;
 }
@@ -68,10 +85,12 @@
     request.HTTPShouldUsePipelining = self.HTTPShouldUsePipelining;
     request.timeoutInterval = self.timeoutInterval;
     request.networkServiceType = self.networkServiceType;
+    for(id key in self.headers)
+        [request setValue:self.headers[key] forHTTPHeaderField:key];
     BOOL isUpload = NO;
-    for(id param in parameters)
+    for(id key in parameters)
     {
-        if([param isKindOfClass:[DCHTTPUpload class]])
+        if([parameters[key] isKindOfClass:[DCHTTPUpload class]])
         {
             isUpload = YES;
             break;
@@ -79,6 +98,7 @@
     }
     if(isUpload)
     {
+        self.type = DCHTTPRequestSerializerRequestTypeUpload;
         if(![self.HTTPMethodsUploadVerb containsObject:request.HTTPMethod])
         {
             *error = [self errorWithDetail:NSLocalizedString(@"File uploads must be preformed with a POST or PUT HTTPMethod.", nil)
@@ -86,8 +106,37 @@
             return nil;
         }
         NSString *boundary = [NSString stringWithFormat:@"Boundary+%08X%08X", arc4random(), arc4random()];
-        [request setValue:[NSString stringWithFormat:@"multipart/form-data; boundary=%@",boundary] forHTTPHeaderField:@"Content-Type"];
-        //do multi form stuff....
+        if(![request valueForHTTPHeaderField:self.contentTypeKey]) {
+            [request setValue:[NSString stringWithFormat:@"multipart/form-data; boundary=%@",boundary] forHTTPHeaderField:self.contentTypeKey];
+        }
+        NSMutableDictionary *notFileParams = [NSMutableDictionary dictionary];
+        NSMutableDictionary *fileParams = [NSMutableDictionary dictionary];
+        for(id key in parameters)
+        {
+            id value = parameters[key];
+            if([value isKindOfClass:[DCHTTPUpload class]]) {
+                [fileParams setObject:value forKey:key];
+            } else {
+                [notFileParams setObject:value forKey:key];
+            }
+        }
+        NSMutableData *data = [NSMutableData data];
+        NSString *initial = [[self class] multiFormInitialBoundary:boundary];
+        [data appendData:[initial dataUsingEncoding:self.stringEncoding]];
+        
+        NSData *paraData = [[self class] multiFormStringFromParameters:notFileParams boundary:boundary encoding:self.stringEncoding];
+        [data appendData:paraData];
+        if(notFileParams.count > 0) {
+            [data appendData:[[[self class] multiFormBoundary:boundary] dataUsingEncoding:self.stringEncoding]];
+        }
+        
+        NSData *fileData = [[self class] multiFormStringFromFiles:fileParams boundary:boundary encoding:self.stringEncoding];
+        [data appendData:fileData];
+        
+        NSString *final = [[self class] multiFormFinalBoundary:boundary];
+        [data appendData:[final dataUsingEncoding:self.stringEncoding]];
+        [request setHTTPBody:data];
+        [request setValue:[NSString stringWithFormat:@"%lu",(unsigned long)[data length]] forHTTPHeaderField:@"Content-Length"];
         return request;
     }
     
@@ -96,7 +145,9 @@
         request.URL = [NSURL URLWithString:[[request.URL absoluteString] stringByAppendingFormat:request.URL.query ? @"&%@" : @"?%@", query]];
     } else {
         NSString *charset = (__bridge NSString *)CFStringConvertEncodingToIANACharSetName(CFStringConvertNSStringEncodingToEncoding(self.stringEncoding));
-        [request setValue:[NSString stringWithFormat:@"application/x-www-form-urlencoded; charset=%@", charset] forHTTPHeaderField:@"Content-Type"];
+        if(![request valueForHTTPHeaderField:self.contentTypeKey]) {
+            [request setValue:[NSString stringWithFormat:@"application/x-www-form-urlencoded; charset=%@", charset] forHTTPHeaderField:self.contentTypeKey];
+        }
         [request setHTTPBody:[query dataUsingEncoding:self.stringEncoding]];
     }
     return request;
@@ -114,8 +165,15 @@
     return [[NSError alloc] initWithDomain:NSLocalizedString(@"DCHTTPRequestSerializer", nil) code:code userInfo:details];
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+-(void)setValue:(id)value forHTTPHeaderField:(NSString*)key
+{
+    if(!self.headers)
+        self.headers = [NSMutableDictionary new];
+    [self.headers setObject:value forKey:key];
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma mark -
-//I borrowed this parameter encoding from the AFNetworking implementation (AFURLRequestSerialization.m).
+//I borrowed some of this parameter encoding from the AFNetworking implementation (AFURLRequestSerialization.m).
 //Thanks!!!
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 +(NSString*)queryStringFromParametersWithEncoding:(NSDictionary *)parameters encoding:(NSStringEncoding)stringEncoding
@@ -164,6 +222,66 @@
     
     return mutableQueryStringComponents;
 }
+static NSString * const kDCMultipartFormCRLF = @"\r\n";
+////////////////////////////////////////////////////////////////////////////////////////////////////
++(NSString*)multiFormInitialBoundary:(NSString*)boundary
+{
+    return [NSString stringWithFormat:@"--%@%@", boundary, kDCMultipartFormCRLF];
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////
++(NSString*)multiFormBoundary:(NSString*)boundary
+{
+    return [NSString stringWithFormat:@"%@--%@%@", kDCMultipartFormCRLF, boundary, kDCMultipartFormCRLF];
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////
++(NSString*)multiFormFinalBoundary:(NSString*)boundary
+{
+    return [NSString stringWithFormat:@"%@--%@--%@", kDCMultipartFormCRLF, boundary, kDCMultipartFormCRLF];
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////
++(NSData*)multiFormStringFromParameters:(NSDictionary *)parameters boundary:(NSString*)boundary encoding:(NSStringEncoding)stringEncoding
+{
+    BOOL addBoundary = NO;
+    NSMutableData *data = [NSMutableData data];
+    for(QueryStringPair *pair in [[self class] queryStringPairsFromDictionary:parameters]) {
+        if(addBoundary)
+            [data appendData:[[[self class] multiFormBoundary:boundary] dataUsingEncoding:stringEncoding]];
+        [data appendData:[[self class] multiFormHeaders:[pair.field description] fileName:nil type:nil encoding:stringEncoding]];
+        [data appendData:[[pair.value description] dataUsingEncoding:stringEncoding]];
+        addBoundary = YES;
+    }
+    return data;
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////
++(NSData*)multiFormStringFromFiles:(NSDictionary *)parameters boundary:(NSString*)boundary encoding:(NSStringEncoding)stringEncoding
+{
+    BOOL addBoundary = NO;
+    NSMutableData *data = [NSMutableData data];
+    for(NSString *key in parameters)
+    {
+        DCHTTPUpload *upload = parameters[key];
+        if(addBoundary)
+            [data appendData:[[[self class] multiFormBoundary:boundary] dataUsingEncoding:stringEncoding]];
+        [data appendData:[[self class] multiFormHeaders:key fileName:upload.fileName type:upload.mimeType encoding:stringEncoding]];
+        [data appendData:upload.data];
+        addBoundary = YES;
+    }
+    return data;
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////
++(NSData*)multiFormHeaders:(NSString*)name fileName:(NSString*)fileName type:(NSString*)mimeType encoding:(NSStringEncoding)stringEncoding
+{
+    NSString *content = [NSString stringWithFormat:@"Content-Disposition: form-data; name=\"%@\"",DCPercentEscapedQueryStringKeyFromStringWithEncoding(name, stringEncoding)];
+    if(fileName)
+    {
+        content = [content stringByAppendingFormat:@"; filename=\"%@\"",fileName];
+    }
+    content = [content stringByAppendingString:kDCMultipartFormCRLF];
+    if(mimeType)
+        content = [content stringByAppendingFormat:@"Content-Type: \"%@\"%@",mimeType,kDCMultipartFormCRLF];
+    content = [content stringByAppendingString:kDCMultipartFormCRLF];
+    return [content dataUsingEncoding:stringEncoding];
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 @end
@@ -172,20 +290,6 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 @implementation QueryStringPair
 
-static NSString * const kDCCharactersToBeEscapedInQueryString = @":/?&=;+!@#$()',*";
-
-static NSString * DCPercentEscapedQueryStringKeyFromStringWithEncoding(NSString *string, NSStringEncoding encoding) {
-    static NSString * const kAFCharactersToLeaveUnescapedInQueryStringPairKey = @"[].";
-    
-	return (__bridge_transfer  NSString *)CFURLCreateStringByAddingPercentEscapes(kCFAllocatorDefault, (__bridge CFStringRef)string,
-                                                                                  (__bridge CFStringRef)kAFCharactersToLeaveUnescapedInQueryStringPairKey, (__bridge CFStringRef)kDCCharactersToBeEscapedInQueryString, CFStringConvertNSStringEncodingToEncoding(encoding));
-}
-
-static NSString * DCPercentEscapedQueryStringValueFromStringWithEncoding(NSString *string, NSStringEncoding encoding) {
-	return (__bridge_transfer  NSString *)CFURLCreateStringByAddingPercentEscapes(kCFAllocatorDefault, (__bridge CFStringRef)string, NULL,
-                                                                                  (__bridge CFStringRef)kDCCharactersToBeEscapedInQueryString,
-                                                                                  CFStringConvertNSStringEncodingToEncoding(encoding));
-}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 - (id)initWithField:(id)field value:(id)value
 {

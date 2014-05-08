@@ -53,7 +53,7 @@ typedef NS_ENUM(NSUInteger, DCHTTPRequestSerializerErrorCode) {
 /**
  Add or set a header value to send with the request.
  */
--(void)setHeaderValue:(id)value forKey:(NSString*)key;
+-(void)setValue:(id)value forHTTPHeaderField:(NSString*)key;
 
 /**
  The string encoding used to serialize parameters. `NSUTF8StringEncoding` by default.
