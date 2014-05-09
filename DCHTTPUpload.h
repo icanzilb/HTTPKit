@@ -32,6 +32,11 @@
 @property(nonatomic,strong)NSURL *fileURL;
 
 /**
+ returns the data from memory or the fileURL.
+ */
+-(NSData*)getData;
+
+/**
  This is a factory method to create an upload object off a file url.
  @param: fileURL is the url to the file you want to upload. It MUST be a file url.
  @return: A newly initialized DCHTTPUpload.

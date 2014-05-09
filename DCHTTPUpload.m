@@ -48,14 +48,11 @@ static inline NSString * DCContentTypeForPathExtension(NSString *extension) {
     return _fileName;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
--(NSData*)data
+-(NSData*)getData
 {
-    if(!_data)
-    {
-        if(self.fileURL)
-            _data = [NSData dataWithContentsOfURL:self.fileURL];
-    }
-    return _data;
+    if(self.fileURL)
+        return [NSData dataWithContentsOfURL:self.fileURL];
+    return self.data;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 +(DCHTTPUpload*)uploadWithFile:(NSURL*)fileURL

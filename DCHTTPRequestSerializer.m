@@ -25,7 +25,6 @@
 
 @interface DCHTTPRequestSerializer ()
 
-@property(nonatomic,assign)DCHTTPRequestSerializerRequestType type;
 @property(nonatomic,strong)NSSet *HTTPMethodsEncodingParametersInURI;
 @property(nonatomic,strong)NSSet *HTTPMethodsUploadVerb;
 @property(nonatomic,copy)NSString *contentTypeKey;
@@ -62,7 +61,6 @@ static NSString * DCPercentEscapedQueryStringValueFromStringWithEncoding(NSStrin
         self.HTTPShouldUsePipelining = NO;
         self.networkServiceType = NSURLNetworkServiceTypeDefault;
         self.timeoutInterval = 60;
-        self.type = DCHTTPRequestSerializerRequestTypeNormal;
         self.HTTPMethodsEncodingParametersInURI = [NSSet setWithObjects:@"GET", @"HEAD", @"DELETE", nil];
         self.HTTPMethodsUploadVerb = [NSSet setWithObjects:@"PUT", @"POST", nil];
         self.contentTypeKey = @"Content-Type";
@@ -98,7 +96,6 @@ static NSString * DCPercentEscapedQueryStringValueFromStringWithEncoding(NSStrin
     }
     if(isUpload)
     {
-        self.type = DCHTTPRequestSerializerRequestTypeUpload;
         if(![self.HTTPMethodsUploadVerb containsObject:request.HTTPMethod])
         {
             *error = [self errorWithDetail:NSLocalizedString(@"File uploads must be preformed with a POST or PUT HTTPMethod.", nil)
@@ -142,20 +139,19 @@ static NSString * DCPercentEscapedQueryStringValueFromStringWithEncoding(NSStrin
     
     NSString *query = [[self class] queryStringFromParametersWithEncoding:parameters encoding:self.stringEncoding];
     if(![self.HTTPMethodsEncodingParametersInURI containsObject:request.HTTPMethod]) {
-        request.URL = [NSURL URLWithString:[[request.URL absoluteString] stringByAppendingFormat:request.URL.query ? @"&%@" : @"?%@", query]];
+        if(query) {
+            request.URL = [NSURL URLWithString:[[request.URL absoluteString] stringByAppendingFormat:request.URL.query ? @"&%@" : @"?%@", query]];
+        }
     } else {
         NSString *charset = (__bridge NSString *)CFStringConvertEncodingToIANACharSetName(CFStringConvertNSStringEncodingToEncoding(self.stringEncoding));
         if(![request valueForHTTPHeaderField:self.contentTypeKey]) {
             [request setValue:[NSString stringWithFormat:@"application/x-www-form-urlencoded; charset=%@", charset] forHTTPHeaderField:self.contentTypeKey];
         }
-        [request setHTTPBody:[query dataUsingEncoding:self.stringEncoding]];
+        if(query) {
+            [request setHTTPBody:[query dataUsingEncoding:self.stringEncoding]];
+        }
     }
     return request;
-}
-////////////////////////////////////////////////////////////////////////////////////////////////////
--(DCHTTPRequestSerializerRequestType)requestType
-{
-    return self.type;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 -(NSError*)errorWithDetail:(NSString*)detail code:(DCHTTPRequestSerializerErrorCode)code
@@ -178,6 +174,8 @@ static NSString * DCPercentEscapedQueryStringValueFromStringWithEncoding(NSStrin
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 +(NSString*)queryStringFromParametersWithEncoding:(NSDictionary *)parameters encoding:(NSStringEncoding)stringEncoding
 {
+    if(!parameters)
+        return nil;
     NSMutableArray *mutablePairs = [NSMutableArray array];
     for(QueryStringPair *pair in [[self class] queryStringPairsFromDictionary:parameters]) {
         [mutablePairs addObject:[pair URLEncodedStringValueWithEncoding:stringEncoding]];
@@ -263,7 +261,7 @@ static NSString * const kDCMultipartFormCRLF = @"\r\n";
         if(addBoundary)
             [data appendData:[[[self class] multiFormBoundary:boundary] dataUsingEncoding:stringEncoding]];
         [data appendData:[[self class] multiFormHeaders:key fileName:upload.fileName type:upload.mimeType encoding:stringEncoding]];
-        [data appendData:upload.data];
+        [data appendData:[upload getData]];
         addBoundary = YES;
     }
     return data;

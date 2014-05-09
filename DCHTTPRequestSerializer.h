@@ -8,12 +8,6 @@
 
 #import <Foundation/Foundation.h>
 
-typedef NS_ENUM(NSUInteger, DCHTTPRequestSerializerRequestType) {
-    DCHTTPRequestSerializerRequestTypeNormal = 0,
-    DCHTTPRequestSerializerRequestTypeDownload,
-    DCHTTPRequestSerializerRequestTypeUpload
-};
-
 typedef NS_ENUM(NSUInteger, DCHTTPRequestSerializerErrorCode) {
     DCHTTPRequestSerializerErrorCodeInvalidParameter = 1,
 };
@@ -33,14 +27,6 @@ typedef NS_ENUM(NSUInteger, DCHTTPRequestSerializerErrorCode) {
                                  method:(NSString*)HTTPMethod
                              parameters:(id)parameters
                                   error:(NSError * __autoreleasing *)error;
-
-/**
- @return: return the type of request this will be. Request types correspond to NSURLSession types.
- DCHTTPRequestSerializerRequestTypeNormal = NSURLSession,
- DCHTTPRequestSerializerRequestTypeDownload = NSURLSessionDownloadTask,
- DCHTTPRequestSerializerRequestTypeUpload = NSURLSessionUploadTask
- */
--(DCHTTPRequestSerializerRequestType)requestType;
 
 @end
 
