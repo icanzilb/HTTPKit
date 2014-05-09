@@ -10,5 +10,6 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '7.0'
   s.osx.deployment_target = '10.9'
   s.source_files = '*.{h,m}'
+  s.dependency 'ConcurrentKit'
   s.requires_arc = true
 end
