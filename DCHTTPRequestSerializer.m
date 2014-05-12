@@ -168,10 +168,6 @@ static NSString * DCPercentEscapedQueryStringValueFromStringWithEncoding(NSStrin
     [self.headers setObject:value forKey:key];
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-#pragma mark -
-//I borrowed some of this parameter encoding from the AFNetworking implementation (AFURLRequestSerialization.m).
-//Thanks!!!
-////////////////////////////////////////////////////////////////////////////////////////////////////
 +(NSString*)queryStringFromParametersWithEncoding:(NSDictionary *)parameters encoding:(NSStringEncoding)stringEncoding
 {
     if(!parameters)
