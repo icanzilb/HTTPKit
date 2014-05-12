@@ -12,7 +12,6 @@ DCHTTPTask *task = [DCHTTPTask GET:@"http://www.vluxe.io"];
 task.thenMain(^(DCHTTPResponse *response){
     NSString *str = [[NSString alloc] initWithData:response.responseObject encoding:NSUTF8StringEncoding];
     NSLog(@"web request finished: %@",str);
-    return nil;
 }).catch(^(NSError *error){
     NSLog(@"failed to load Request: %@",[error localizedDescription]);
 });
@@ -32,7 +31,6 @@ task.then(^(DCHTTPResponse *response) {
 }).thenMain(^(NSString *str) {
     //this is the main thread
     //load modified webpage into webview...
-    return nil;
 }).catch(^(NSError *error){
     NSLog(@"got an error: %@",[error localizedDescription]);
 });
@@ -51,7 +49,6 @@ task.responseSerializer = [DCJSONResponseSerializer new];
 task.thenMain(^(DCHTTPResponse *response){
     NSLog(@"payload: %@",response.responseObject);
     NSLog(@"finished POST task");
-    return nil;
 }).catch(^(NSError *error){
     NSLog(@"failed to upload file: %@",[error localizedDescription]);
 });
@@ -133,7 +130,7 @@ This will upload a file in the background. It is important to note NSURLSession 
 
 ## HTTP Manager
 
-API interaction is a very common need on mobile. HTTPKit has got you covered. 
+API interaction is a very common need on mobile. HTTPKit has got you covered.
 ```objc
 DCHTTPTaskManager *manager = [DCHTTPTaskManager new];
 manager.baseURL = @"http://domain.com/1/";
@@ -160,6 +157,24 @@ otherTask.thenMain(^(DCHTTPResponse *response){
 ```
 
 The tasks will be created and contain the shared data (baseURL,header value, auth_token parameter,etc). The DCHTTPTaskManager has the JSON serializer as its default serializer.
+
+## Serializer
+
+Each request can have a request and response serializer. These basically serialize or encode/decode the request parameters and responses. They are very simple to use. By default the HTTPRequestSerializer is used for the requestSerializer and No responseSerializer is set by default (meaning an NSData object will be returned).
+
+```objc
+DCHTTPTask *task = [manager POST:@"users" parameters:@{@"id": @1}];
+//set both to be JSON serializer
+task.requestSerializer = [DCJSONRequestSerializer new];
+task.responseSerializer = [DCJSONResponseSerializer new];
+```
+
+You can set multiple response serializer for each different content Types as well.
+
+```objc
+[task setResponseSerializer:[DCJSONResponseSerializer new] forContentType:@"application/json"];
+```
+The JSONResponse serializer will only be used for that contentType and the `responseSerializer` will be used for all the rest.
 
 ## Other
 
@@ -194,7 +209,7 @@ Change to the directory of your Xcode project, and Create and Edit your Podfile 
 	$ touch Podfile
 	$ edit Podfile
 	platform :ios, '7.0'
-  #or platform :osx, '10.9'
+	#or platform :osx, '10.9'
 	pod 'HTTPKit'
 
 Install into your project:

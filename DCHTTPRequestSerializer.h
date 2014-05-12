@@ -84,3 +84,11 @@ typedef NS_ENUM(NSUInteger, DCHTTPRequestSerializerErrorCode) {
 @property (nonatomic, assign) NSTimeInterval timeoutInterval;
 
 @end
+
+///-------------------------------
+/// @name JSON request serializer
+///-------------------------------
+
+@interface DCJSONRequestSerializer : DCHTTPRequestSerializer
+
+@end

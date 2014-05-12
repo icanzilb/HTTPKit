@@ -312,3 +312,37 @@ static NSString * const kDCMultipartFormCRLF = @"\r\n";
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 @end
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+@implementation DCJSONRequestSerializer
+
+-(NSURLRequest*)requestBySerializingUrl:(NSURL*)url
+                                 method:(NSString*)HTTPMethod
+                             parameters:(id)parameters
+                                  error:(NSError * __autoreleasing *)error
+{
+    if ([self.HTTPMethodsEncodingParametersInURI containsObject:HTTPMethod]) {
+        return [super requestBySerializingUrl:url method:HTTPMethod parameters:parameters error:error];
+    }
+    
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url
+                                                           cachePolicy:self.cachePolicy
+                                                       timeoutInterval:self.timeoutInterval];
+    
+    for(id key in self.headers)
+        [request setValue:self.headers[key] forHTTPHeaderField:key];
+    
+    if (!parameters) {
+        return request;
+    }
+    
+    NSString *charset = (__bridge NSString *)CFStringConvertEncodingToIANACharSetName(CFStringConvertNSStringEncodingToEncoding(NSUTF8StringEncoding));
+    [request setValue:[NSString stringWithFormat:@"application/json; charset=%@", charset] forHTTPHeaderField:self.contentTypeKey];
+    [request setHTTPBody:[NSJSONSerialization dataWithJSONObject:parameters options:0 error:error]];
+    
+    return request;
+}
+
+@end
