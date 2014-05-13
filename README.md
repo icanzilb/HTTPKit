@@ -39,7 +39,7 @@ task.then(^(DCHTTPResponse *response) {
 });
 [task start];
 ```
-Boom. We just made a request, did some possibly long running operation (like parsing and modifying a webpage in this example), then switch to the UI thread to update the UI. We don't suffer from rightward driving blocks and our code stays simple, clean, and totally async. Your welcome.
+Boom. We just made a request, did some possibly long running operation (like parsing and modifying a webpage in this example), then switch to the UI thread to update the UI. We don't suffer from rightward driving blocks and our code stays simple, clean, and totally async. You're welcome.
  
 ## POST
 
